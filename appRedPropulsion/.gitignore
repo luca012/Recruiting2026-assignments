@@ -1,0 +1,10 @@
+# Zephyr build artifacts
+build/
+
+# Zephyr pristine build backups (sometimes generated)
+build_*/
+
+# IDE and OS specific files
+.vscode/
+.idea/
+.DS_Store
