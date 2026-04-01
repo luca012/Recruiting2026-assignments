@@ -3,6 +3,7 @@ build/
 modules/
 zephyr/
 appRedPropulsion/build
+.west/
 
 # Zephyr pristine build backups (sometimes generated)
 build_*/
