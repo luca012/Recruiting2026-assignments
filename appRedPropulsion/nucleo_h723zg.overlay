@@ -25,6 +25,14 @@
             label = "Encoder Phase B";
         };
     };
+
+    servo_hardware: servo_hardware {
+        compatible = "gpio-keys";
+        en_pin: en_pin {
+            gpios = <&gpiod 7 GPIO_ACTIVE_HIGH>; /* PD7 pin */
+            label = "Servo TX/RX Enable Pin";
+        };
+    };
 };
 
 &timers15 {
@@ -36,4 +44,22 @@
         pinctrl-0 = <&tim15_ch1n_pe4>; /* TIM15_CH1N on PE4, it exists only negated */
         pinctrl-names = "default";
     };
+};
+
+/* UART config for the ST3215 Servo */
+&pinctrl {
+    uart2_tx_pd5: uart2_tx_pd5 {
+        pinmux = <STM32_PINMUX('D', 5, AF7)>; /* PD5 as UART2_TX */
+    };
+
+    uart2_rx_pd6: uart2_rx_pd6 {
+        pinmux = <STM32_PINMUX('D', 6, AF7)>; /* PD6 as UART2_RX */
+    };
+};
+
+&uart2 {
+    pinctrl-0 = <&uart2_tx_pd5 &uart2_rx_pd6>;
+    pinctrl-names = "default";
+    current-speed = <1000000>; /* 1 Mbps for ST3215 */
+    status = "okay";
 };
