@@ -1,0 +1,19 @@
+# Waveshare ST3215 Serial Bus Servo Driver
+
+A [servo motor](https://en.wikipedia.org/wiki/Servomotor) is essentially a specialized rotary actuator designed for high-precision control of angular position, velocity, and acceleration. Unlike a standard DC motor, which spins freely as long as power is applied, a servo is built to move to a specific angle and maintain it with high accuracy. For a visual demonstration and a deeper explanation of how these components function, [this video](https://www.youtube.com/watch?v=1WnGv-DPexc) provides an excellent foundation, while the [ST3215 wiki](https://www.waveshare.com/wiki/ST3215_Servo) covers the specific hardware specifications for the component used in this project.
+
+## PWM and Serial Communication
+There are two primary methods for controlling a servo. Traditional servos rely on Pulse Width Modulation (PWM), where the width of a timed electrical pulse (like 1ms or 2ms every ~20ms) dictates the motor's position. While PWM is simple and widely supported, it is essentially a one-way street; the microcontroller sends a command, but the servo cannot "talk back" to report its actual position, temperature, or status.\\
+The Waveshare ST3215 used in this project is instead a Serial Bus servo: by using a digital [UART](https://www.circuitbasics.com/basics-uart-communication/) protocol, many of these servos can be "daisy-chained" together on a single bus (with PWM each one requires its own wire). More importantly, serial servos allow two-way telemetry: other thank making it rotate, we can query the ST3215 for real-time feedback, such as its current angle, internal temperature, and load.
+* Source: [Serial servos guide](https://www.kevsrobots.com/blog/serial-servos.html).
+
+## Communication Protocol
+The ST3215 operates on an asynchronous serial protocol, typically running at a high-speed baud rate of 1 Mbps. Communication is structured around command packets, as detailed in the [protocol manual](https://files.waveshare.com/upload/2/27/Communication_Protocol_User_Manual-EN%28191218-0923%29.pdf). These packets follow a strict architecture: 
+A typical command packet follows this structure: `[Header: 0xFF 0xFF] [ID] [Length] [Instruction] [Parameters] [Checksum]`.\\
+The dual-byte header (`0xFF 0xFF`) is followed by the unique ID of the target servo, the data length, the specific instruction (such as a write or read command), the parameters, and finally a checksum to ensure data integrity.
+
+## Hardware
+The ST3215 protocol manual specifically says that communication is asynchronous duplex: the controller sends out the instruction package and the servo returns the response package, and of course it's important to ensure that they each componente waits for its turn and that data isn't transmitted at the same time, causing a collision. To control the servo we use the [STM32 Nucleo-H723ZG](https://www.st.com/en/evaluation-tools/nucleo-h723zg.html) microcontroller, specifically pins PD5 (TX) and PD6 (RX) for the data stream, while PD7 (Enable) serves as a hardware switch. By toggling the Enable pin, the driver can manually switch the circuit between transmit and receive modes to prevent data collisions. For details on the wiring check out the [bus servo control circuit](https://www.waveshare.com/w/upload/d/d3/Bus_servo_control_circuit.pdf) design.
+
+## Goal of the project
+The goal of this project is to build a robust driver (a C API) with the Zephyr RTOS ecosystem that abstracts these low-level complexities. The user will interact with a clean C API: the driver will handle the details described before for the communication protocol and providie simple functions to set the servo angle and retrieve real-time position feedback and also the other functions mentioned in section 1.3 of the protocol manual.
