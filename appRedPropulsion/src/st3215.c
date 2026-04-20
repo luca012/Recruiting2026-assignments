@@ -4,8 +4,10 @@
 // zepyhr logger for the driver, useful for debugging
 LOG_MODULE_REGISTER(st3215_servo, LOG_LEVEL_DBG);
 
-/* @brief Calculates the checksum of the ST3215 packet.
- * The checksum is the bitwise NOT of the sum of the bytes starting from the ID.
+/** @brief Calculates the checksum of the ST3215 packet. The checksum is the bitwise NOT of the sum of the bytes starting from the ID.
+ * @param packet The packet for which to calculate the checksum.
+ * @param total_length The total length of the packet (including header and checksum).
+ * @return The calculated checksum byte.
  */
 static uint8_t st3215_calc_checksum(uint8_t *packet, uint8_t total_length) {
     uint32_t sum = 0;
@@ -43,7 +45,7 @@ int st3215_init(struct st3215_device *dev) {
     return 0;
 }
 
-/*
+/**
  * @brief Sets the angle of the ST3215 servo.
  * @param dev Pointer to the ST3215 device.
  * @param angle Desired angle (0-4095).
@@ -58,8 +60,7 @@ int st3215_set_angle(struct st3215_device *dev, uint16_t angle) {
     packet[0] = ST3215_HEADER;
     packet[1] = ST3215_HEADER;
     packet[2] = ST3215_ID_DEFAULT;   
-    packet[3] = 0x05;
-    packet[4] = ST3215_INST_WRITE;
+    packet[3] = 0x05;   // remaining packet length (5 bytes: Instruction + Address + Data Length + 2 bytes of angle + Checksum)
     packet[5] = ST3215_REG_GOAL_POS;
     packet[6] = angle_low;
     packet[7] = angle_high;
@@ -75,6 +76,84 @@ int st3215_set_angle(struct st3215_device *dev, uint16_t angle) {
 
     k_usleep(100);
     gpio_pin_set_dt(&dev->enable_pin, 0); // back to RX mode after sending 
+
+    return 0;
+}
+
+/**
+    * @brief Reads the current angle of the ST3215 servo.
+    * @param dev Pointer to the ST3215 device.
+    * @param angle Pointer to store the read angle.
+    * @return 0 on success, a negative value on error.
+*/
+int st3215_get_angle(struct st3215_device *dev, uint16_t *angle) {
+    uint8_t request[8];
+    uint8_t response[8];
+    
+    // preparing the read packet to request the current angle from the servo
+    request[0] = ST3215_HEADER;
+    request[1] = ST3215_HEADER;
+    request[2] = ST3215_ID_DEFAULT;
+    request[3] = 0x04; // remaining packet length (4 bytes: Instruction + Address + Data Length + Checksum)
+    request[4] = ST3215_INST_READ;
+    request[5] = ST3215_REG_PRESENT_POS;
+    request[6] = 0x02; // we want to read 2 bytes (the angle is 16-bit) starting from the position specified in request[5]
+    request[7] = st3215_calc_checksum(request, 8);
+
+    gpio_pin_set_dt(&dev->enable_pin, 1); // TX Mode to send data
+    for (int i = 0; i < 8; i++) {
+        uart_poll_out(dev->uart_dev, request[i]);
+    }
+    
+    // sleep to make sure the data is sent before switching to receive mode
+    k_usleep(50); 
+
+    gpio_pin_set_dt(&dev->enable_pin, 0); // RX Mode to receive data
+
+    // handle servo's answer and eventual timeout
+    int bytes_received = 0;
+    int attempts = 0;
+    const int MAX_ATTEMPTS = 1000; // timeout after 1000 attempts
+
+    while (bytes_received < 8 && attempts < MAX_ATTEMPTS) {
+        unsigned char c;
+        if (uart_poll_in(dev->uart_dev, &c) == 0) {
+            response[bytes_received++] = c;
+        } else {
+            attempts++;
+            k_usleep(10); // waits 10 microseconds before trying again to receive data
+        }
+    }
+
+    if (bytes_received < 8) {
+        LOG_ERR("Error: timeout receiving data (only %d bytes received)", bytes_received);
+        return -ETIMEDOUT;
+    }
+    // response structure: [0xFF, 0xFF, ID, Len, Status, Val_LOW, Val_HIGH, Checksum]
+    
+    // response checks    
+    if (response[0] != 0xFF || response[1] != 0xFF) {
+        LOG_ERR("Errore: invalid headers!");
+        return -EINVAL; // or EIO?
+    }
+    if (response[2] != ST3215_ID_DEFAULT) {
+    LOG_ERR("Errore: Risposta da ID inatteso (Ricevuto: %d)", response[2]);
+    return -EIO;
+    }
+    if (response[4] != 0) { // see doc page 3 for the meaning of the status byte
+        LOG_WRN("Response Error! Status Byte: 0x%02X", response[4]);
+    }
+
+    // checks the checksum of the received packet to verify data integrity
+    uint8_t rx_checksum = st3215_calc_checksum(response, 8);
+    if (rx_checksum != response[7]) {
+        LOG_ERR("Error: checksum response not valid! (calculated: 0x%02X, Received: 0x%02X)", 
+                rx_checksum, response[7]);
+        return -EBADMSG;
+    }
+
+    // reconstruction of the angle (combining the two bytes)
+    *angle = response[5] | (response[6] << 8);
 
     return 0;
 }
