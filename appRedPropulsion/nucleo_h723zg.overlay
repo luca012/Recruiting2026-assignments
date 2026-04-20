@@ -28,7 +28,7 @@
 
     servo_hardware: servo_hardware {
         compatible = "gpio-keys";
-        en_pin: en_pin {
+        enable_pin: enable_pin {
             gpios = <&gpiod 7 GPIO_ACTIVE_HIGH>; /* PD7 pin */
             label = "Servo TX/RX Enable Pin";
         };
@@ -57,7 +57,7 @@
     };
 };
 
-&uart2 {
+&usart2 {
     pinctrl-0 = <&uart2_tx_pd5 &uart2_rx_pd6>;
     pinctrl-names = "default";
     current-speed = <1000000>; /* 1 Mbps for ST3215 */
