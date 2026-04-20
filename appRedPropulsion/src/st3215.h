@@ -21,7 +21,7 @@
 // struct to define important parameters of the servo
 struct st3215_device {
     const struct device *uart_dev;  // pointer to the UART hardware (PD5, PD6)
-    struct gpio_dt_spec enable_pin;     // the Direction Control Pin (PD7)
+    struct gpio_dt_spec enable_pin; // the direction control Pin (PD7)
 };
 
 /**
