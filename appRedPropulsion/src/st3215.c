@@ -46,6 +46,71 @@ int st3215_init(struct st3215_device *dev) {
 }
 
 /**
+ * @brief Sends a PING command to verify if the servo is connected and responsive.
+ * @param dev Pointer to the ST3215 device structure.
+ * @return 0 if the servo responds correctly, a negative error code otherwise. 
+ */
+int st3215_ping(struct st3215_device *dev) {
+    uint8_t request[6];
+    uint8_t response[6];
+    
+    request[0] = ST3215_HEADER;
+    request[1] = ST3215_HEADER;
+    request[2] = ST3215_ID_DEFAULT;
+    request[3] = 0x02;             // remaining packet  length (2 bytes: ping instruction + checksum)
+    request[4] = ST3215_INST_PING; // 0x01
+    request[5] = st3215_calc_checksum(request, 6);
+
+    // TX Mode
+    gpio_pin_set_dt(&dev->enable_pin, 1);
+    for (int i = 0; i < 6; i++) {
+        uart_poll_out(dev->uart_dev, request[i]);
+    }
+    k_usleep(50);
+
+    // RX Mode
+    gpio_pin_set_dt(&dev->enable_pin, 0);
+
+    // response handling with timeout
+    int bytes_received = 0;
+    int attempts = 0;
+    while (bytes_received < 6 && attempts < 1000) {
+        unsigned char c;
+        if (uart_poll_in(dev->uart_dev, &c) == 0) {
+            response[bytes_received++] = c;
+        } else {
+            attempts++;
+            k_usleep(10);
+        }
+    }
+    // response structure: [0xFF, 0xFF, ID, Len, Status, Checksum]
+
+    // response checks
+    if (bytes_received < 6) {
+        LOG_ERR("PING failed: timeout receiving data (only %d bytes received)", bytes_received);
+        return -ETIMEDOUT;
+    }
+    if (response[0] != 0xFF || response[1] != 0xFF) {
+        LOG_ERR("PING failed: invalid headers!");
+        return -EIO;
+    }
+    if (response[2] != ST3215_ID_DEFAULT) {
+        LOG_ERR("PING failed: incorrect ID!");
+        return -EIO;
+    }
+    if (response[4] != 0) { // see doc page 3 for the meaning of the status byte
+        LOG_WRN("PING response error! Status Byte: 0x%02X", response[4]);
+    }
+    uint8_t rx_checksum = st3215_calc_checksum(response, 6);
+    if (rx_checksum != response[5]) {
+        LOG_ERR("PING failed: checksum response not valid! (calculated: 0x%02X, Received: 0x%02X)", rx_checksum, response[5]);
+        return -EBADMSG;
+    }
+
+    return 0;
+}
+
+/**
  * @brief Sets the angle of the ST3215 servo.
  * @param dev Pointer to the ST3215 device.
  * @param angle Desired angle (0-4095).
@@ -134,7 +199,7 @@ int st3215_get_angle(struct st3215_device *dev, uint16_t *angle) {
     // response checks    
     if (response[0] != 0xFF || response[1] != 0xFF) {
         LOG_ERR("Errore: invalid headers!");
-        return -EINVAL; // or EIO?
+        return -EIO;
     }
     if (response[2] != ST3215_ID_DEFAULT) {
     LOG_ERR("Errore: Risposta da ID inatteso (Ricevuto: %d)", response[2]);

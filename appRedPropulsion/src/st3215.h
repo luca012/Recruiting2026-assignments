@@ -30,6 +30,12 @@ struct st3215_device {
 int st3215_init(struct st3215_device *dev);
 
 /**
+ * @brief Sends a PING command to verify if the servo is connected.
+ * @return 0 if the servo responds correctly, error code otherwise.
+ */
+int st3215_ping(struct st3215_device *dev);
+
+/**
  * @brief Commands the servo to move to a specific angle.
  * @param angle The target angle (usually 0 to 4095 for these servos).
  */
