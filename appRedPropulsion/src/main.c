@@ -33,6 +33,15 @@ int main(void) {
         return 0;
     }
 
+    LOG_INF("Running PING on the servo...");
+    ret = st3215_ping(&servo);
+    if (ret == 0) {
+        LOG_INF("PING completed successfully. Servo is responsive.");
+    } else {
+        LOG_ERR("PING failed (Code: %d)", ret);
+        return 0; // uncomment if you still want to continue even if the ping fails
+    }
+
     LOG_INF("System ready. Starting main loop...");
 
     uint16_t target_angle = 1000; // between 0 and 4095, where 0 is 0 deg and 4095 is 360 de
