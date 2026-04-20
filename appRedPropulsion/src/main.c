@@ -35,19 +35,22 @@ int main(void) {
 
     LOG_INF("System ready. Starting main loop...");
 
-    uint16_t position = 1000; // between 0 and 4095, where 0 is 0° and 4095 is 360°
+    uint16_t target_angle = 1000; // between 0 and 4095, where 0 is 0 deg and 4095 is 360 de
+    uint16_t current_angle = 0;
 
     while (1) {
         gpio_pin_toggle_dt(&led);
 
-        st3215_set_angle(&servo, position);
+        st3215_set_angle(&servo, target_angle);
 
-        if (position == 1000) {
-            position = 3000;
-        } else {
-            position = 1000;
+        k_msleep(500); // wait for the servo to move to the target position
+
+        if (st3215_get_angle(&servo, &current_angle) == 0) {
+            LOG_INF("Current position read: %d", current_angle);
         }
 
+        target_angle = (current_angle == 1000) ? 3000 : 1000;
+        
         k_msleep(2000);
     }
 
