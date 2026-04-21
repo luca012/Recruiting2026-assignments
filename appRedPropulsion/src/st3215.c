@@ -11,7 +11,7 @@ LOG_MODULE_REGISTER(st3215_servo, LOG_LEVEL_DBG);
  */
 static uint8_t st3215_calc_checksum(uint8_t *packet, uint8_t total_length) {
     uint32_t sum = 0;
-    // Sommiamo dall'ID (indice 2) fino al byte prima del checksum
+    // sums all the bytes starting from the ID (index 2) up to the last byte before the checksum
     for (int i = 2; i < total_length - 1; i++) {
         sum += packet[i];
     }
