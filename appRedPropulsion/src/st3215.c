@@ -61,14 +61,17 @@ int st3215_ping(struct st3215_device *dev) {
     request[4] = ST3215_INST_PING; // 0x01
     request[5] = st3215_calc_checksum(request, 6);
 
-    // TX Mode
+    // TX Mode: setting the PD7 enable pin HIGH to send data to the servo
     gpio_pin_set_dt(&dev->enable_pin, 1);
+
+    // send the ping packet byte by byte through UART
     for (int i = 0; i < 6; i++) {
         uart_poll_out(dev->uart_dev, request[i]);
     }
-    k_usleep(50);
 
-    // RX Mode
+    k_usleep(50); // wait to ensure the packet is sent before switching to receive mode
+
+    // RX Mode: setting the PD7 pin back to 0 to listen for the servo's response
     gpio_pin_set_dt(&dev->enable_pin, 0);
 
     // response handling with timeout

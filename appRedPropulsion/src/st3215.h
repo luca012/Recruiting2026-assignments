@@ -5,7 +5,7 @@
 #include <zephyr/drivers/uart.h>
 #include <zephyr/drivers/gpio.h>
 
-#define ST3215_HEADER         0xFF // always 0xFF
+#define ST3215_HEADER         0xFF
 #define ST3215_ID_DEFAULT     0x01
 
 // instruction commands
